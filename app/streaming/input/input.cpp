@@ -107,6 +107,24 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
     m_SpecialKeyCombos[KeyComboPasteText].scanCode = SDL_SCANCODE_V;
     m_SpecialKeyCombos[KeyComboPasteText].enabled = true;
 
+    m_SpecialKeyCombos[KeyComboFetchClipboard].keyCombo = KeyComboFetchClipboard;
+    m_SpecialKeyCombos[KeyComboFetchClipboard].keyCode = SDLK_b;
+    m_SpecialKeyCombos[KeyComboFetchClipboard].scanCode = SDL_SCANCODE_B;
+    m_SpecialKeyCombos[KeyComboFetchClipboard].enabled = true;
+
+    m_SpecialKeyCombos[KeyComboServerCmdMenu].keyCombo = KeyComboServerCmdMenu;
+    m_SpecialKeyCombos[KeyComboServerCmdMenu].keyCode = SDLK_0;
+    m_SpecialKeyCombos[KeyComboServerCmdMenu].scanCode = SDL_SCANCODE_0;
+    m_SpecialKeyCombos[KeyComboServerCmdMenu].enabled = true;
+
+    for (int i = 0; i < 9; i++) {
+        int comboId = KeyComboServerCmd1 + i;
+        m_SpecialKeyCombos[comboId].keyCombo = static_cast<KeyCombo>(comboId);
+        m_SpecialKeyCombos[comboId].keyCode = SDLK_1 + i;
+        m_SpecialKeyCombos[comboId].scanCode = static_cast<SDL_Scancode>(SDL_SCANCODE_1 + i);
+        m_SpecialKeyCombos[comboId].enabled = true;
+    }
+
     m_SpecialKeyCombos[KeyComboTogglePointerRegionLock].keyCombo = KeyComboTogglePointerRegionLock;
     m_SpecialKeyCombos[KeyComboTogglePointerRegionLock].keyCode = SDLK_l;
     m_SpecialKeyCombos[KeyComboTogglePointerRegionLock].scanCode = SDL_SCANCODE_L;

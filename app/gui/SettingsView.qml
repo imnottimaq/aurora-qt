@@ -981,6 +981,38 @@ Flickable {
                     ToolTip.visible: hovered
                     ToolTip.text: qsTr("This will close the app or game you are streaming when you end your stream. You will lose any unsaved progress!")
                 }
+
+                CheckBox {
+                    id: virtualDisplayCheck
+                    width: parent.width
+                    text: qsTr("Use virtual display (Apollo)")
+                    font.pointSize: 12
+                    checked: StreamingPreferences.virtualDisplay
+                    onCheckedChanged: {
+                        StreamingPreferences.virtualDisplay = checked
+                    }
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 5000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("Automatically create a virtual display on the Apollo host matching your streaming resolution and refresh rate.")
+                }
+
+                CheckBox {
+                    id: smartClipboardSyncCheck
+                    width: parent.width
+                    text: qsTr("Smart clipboard synchronization (Apollo)")
+                    font.pointSize: 12
+                    checked: StreamingPreferences.smartClipboardSync
+                    onCheckedChanged: {
+                        StreamingPreferences.smartClipboardSync = checked
+                    }
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 5000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("Synchronize clipboard content directly with Apollo host rather than simulating keystrokes.")
+                }
             }
         }
 

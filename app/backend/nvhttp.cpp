@@ -200,7 +200,8 @@ NvHTTP::startApp(QString verb,
                  bool localAudio,
                  int gamepadMask,
                  bool persistGameControllersOnDisconnect,
-                 QString& rtspSessionUrl)
+                 QString& rtspSessionUrl,
+                 bool virtualDisplay)
 {
     int riKeyId;
 
@@ -229,6 +230,7 @@ NvHTTP::startApp(QString verb,
                                    "&remoteControllersBitmap="+QString::number(gamepadMask)+
                                    "&gcmap="+QString::number(gamepadMask)+
                                    "&gcpersist="+QString::number(persistGameControllersOnDisconnect ? 1 : 0)+
+                                   (virtualDisplay ? "&virtualDisplay=1" : "")+
                                    LiGetLaunchUrlQueryParameters(),
                                    LAUNCH_TIMEOUT_MS);
 
@@ -418,6 +420,29 @@ NvHTTP::getXmlString(QString xml,
     return QString();
 }
 
+QStringList
+NvHTTP::getXmlStringList(QString xml,
+                         QString tagName)
+{
+    QXmlStreamReader xmlReader(xml);
+    QStringList result;
+
+    while (!xmlReader.atEnd())
+    {
+        if (xmlReader.readNext() != QXmlStreamReader::StartElement)
+        {
+            continue;
+        }
+
+        if (xmlReader.name() == tagName)
+        {
+            result.append(xmlReader.readElementText());
+        }
+    }
+
+    return result;
+}
+
 void NvHTTP::handleSslErrors(QNetworkReply* reply, const QList<QSslError>& errors)
 {
     bool ignoreErrors = true;
@@ -560,3 +585,142 @@ NvHTTP::openConnection(QUrl baseUrl,
 
     return reply;
 }
+
+QNetworkReply*
+NvHTTP::openPostConnection(QUrl baseUrl,
+                           QString command,
+                           QString arguments,
+                           QByteArray body,
+                           int timeoutMs,
+                           NvLogLevel logLevel)
+{
+    Q_ASSERT(baseUrl.port(0) != 0);
+
+    QUrl url(baseUrl);
+    url.setPath("/" + command);
+
+    url.setQuery("uniqueid=0123456789ABCDEF&uuid=" +
+                 QUuid::createUuid().toRfc4122().toHex() +
+                 ((arguments != nullptr) ? ("&" + arguments) : ""));
+
+    QNetworkRequest request(url);
+    request.setSslConfiguration(IdentityManager::get()->getSslConfig());
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    request.setAttribute(QNetworkRequest::Http2AllowedAttribute, false);
+#endif
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 3, 0)
+    request.setAttribute(QNetworkRequest::ConnectionCacheExpiryTimeoutSecondsAttribute, 0);
+#endif
+
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "text/plain");
+
+    auto sslErrorsConnection = connect(m_Nam, &QNetworkAccessManager::sslErrors, this, &NvHTTP::handleSslErrors);
+    QNetworkReply* reply = m_Nam->post(request, body);
+
+    QEventLoop loop;
+    connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+    connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit, &loop, &QEventLoop::quit);
+    if (timeoutMs) {
+        QTimer::singleShot(timeoutMs, &loop, &QEventLoop::quit);
+    }
+    if (logLevel >= NvLogLevel::NVLL_VERBOSE) {
+        qInfo() << "Executing POST request:" << url.toString();
+    }
+    loop.exec(QEventLoop::ExcludeUserInputEvents);
+
+    if (timeoutMs && !reply->isFinished()) {
+        if (logLevel >= NvLogLevel::NVLL_ERROR) {
+            qWarning() << "Request to" << url.toString() << "timed out after" << timeoutMs << "ms";
+        }
+        reply->abort();
+    }
+
+#if QT_VERSION < QT_VERSION_CHECK(6, 3, 0)
+    m_Nam->clearAccessCache();
+#endif
+    disconnect(sslErrorsConnection);
+
+    if (reply->error() != QNetworkReply::NoError)
+    {
+        if (logLevel >= NvLogLevel::NVLL_ERROR) {
+            qWarning() << command << "POST request failed with error:" << reply->error();
+        }
+
+        if (reply->error() == QNetworkReply::SslHandshakeFailedError) {
+            GfeHttpResponseException exception(401, "Server certificate mismatch");
+            delete reply;
+            throw exception;
+        }
+        else if (reply->error() == QNetworkReply::OperationCanceledError) {
+            QtNetworkReplyException exception(QNetworkReply::TimeoutError, "Request timed out");
+            delete reply;
+            throw exception;
+        }
+        else {
+            QtNetworkReplyException exception(reply->error(), reply->errorString());
+            delete reply;
+            throw exception;
+        }
+    }
+
+    return reply;
+}
+
+QString
+NvHTTP::openPostConnectionToString(QUrl baseUrl,
+                                   QString command,
+                                   QString arguments,
+                                   QByteArray body,
+                                   int timeoutMs,
+                                   NvLogLevel logLevel)
+{
+    QNetworkReply* reply = openPostConnection(baseUrl, command, arguments, body, timeoutMs, logLevel);
+    QString ret;
+
+    QTextStream stream(reply);
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    stream.setEncoding(QStringConverter::Utf8);
+#else
+    stream.setCodec("UTF-8");
+#endif
+
+    ret = stream.readAll();
+    delete reply;
+
+    return ret;
+}
+
+bool
+NvHTTP::sendClipboard(const QString& text)
+{
+    try {
+        openPostConnectionToString(m_BaseUrlHttps,
+                                   "actions/clipboard",
+                                   "type=text",
+                                   text.toUtf8(),
+                                   REQUEST_TIMEOUT_MS,
+                                   NvLogLevel::NVLL_VERBOSE);
+        return true;
+    } catch (const std::exception& e) {
+        qWarning() << "Failed to send clipboard via HTTP:" << e.what();
+        return false;
+    }
+}
+
+QString
+NvHTTP::getClipboard()
+{
+    try {
+        return openConnectionToString(m_BaseUrlHttps,
+                                      "actions/clipboard",
+                                      "type=text",
+                                      REQUEST_TIMEOUT_MS,
+                                      NvLogLevel::NVLL_VERBOSE);
+    } catch (const std::exception& e) {
+        qWarning() << "Failed to get clipboard via HTTP:" << e.what();
+        return QString();
+    }
+}
+

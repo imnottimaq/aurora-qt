@@ -129,6 +129,12 @@ public:
 
     void setShouldExit(bool quitHostApp = false);
 
+    // Apollo protocol extensions
+    bool executeServerCommand(int commandIndex);
+    void showServerCommandsMenu();
+    bool sendClipboard(const QString& text);
+    QString fetchClipboard();
+
 signals:
     void stageStarting(QString stage);
 

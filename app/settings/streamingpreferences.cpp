@@ -48,6 +48,8 @@
 #define SER_SWAPMOUSEBUTTONS "swapmousebuttons"
 #define SER_MUTEONFOCUSLOSS "muteonfocusloss"
 #define SER_BACKGROUNDGAMEPAD "backgroundgamepad"
+#define SER_VIRTUALDISPLAY "virtualdisplay"
+#define SER_SMARTCLIPBOARDSYNC "smartclipboardsync"
 #define SER_REVERSESCROLL "reversescroll"
 #define SER_SWAPFACEBUTTONS "swapfacebuttons"
 #define SER_CAPTURESYSKEYS "capturesyskeys"
@@ -172,6 +174,8 @@ void StreamingPreferences::reload()
                                                                                                                  : UIDisplayMode::UI_MAXIMIZED)).toInt());
     language = static_cast<Language>(settings.value(SER_LANGUAGE,
                                                     static_cast<int>(Language::LANG_AUTO)).toInt());
+    virtualDisplay = settings.value(SER_VIRTUALDISPLAY, true).toBool();
+    smartClipboardSync = settings.value(SER_SMARTCLIPBOARDSYNC, true).toBool();
 
 
     // Perform default settings updates as required based on last default version
@@ -364,6 +368,8 @@ void StreamingPreferences::save()
     settings.setValue(SER_SWAPFACEBUTTONS, swapFaceButtons);
     settings.setValue(SER_CAPTURESYSKEYS, captureSysKeysMode);
     settings.setValue(SER_KEEPAWAKE, keepAwake);
+    settings.setValue(SER_VIRTUALDISPLAY, virtualDisplay);
+    settings.setValue(SER_SMARTCLIPBOARDSYNC, smartClipboardSync);
 }
 
 int StreamingPreferences::getDefaultBitrate(int width, int height, int fps, bool yuv444)

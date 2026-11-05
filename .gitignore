@@ -1,9 +1,20 @@
 *pro.user
 
-
 **/.vs/
 .vscode/
 build/
 libs/
-config.tests/*/.qmake.stash
-config.tests/*/Makefile
+config.tests/
+Makefile*
+*.a
+*.o
+*.stash
+.qmake.cache
+.qmake.stash
+config.log
+release/
+debug/
+app/aurora
+app/aurora.exe
+app/aurora.app
+pyrowave/pyrowave_generated/

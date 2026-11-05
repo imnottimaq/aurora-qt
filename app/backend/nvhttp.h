@@ -130,6 +130,11 @@ public:
                  QString tagName);
 
     static
+    QStringList
+    getXmlStringList(QString xml,
+                     QString tagName);
+
+    static
     QByteArray
     getXmlStringFromHex(QString xml,
                         QString tagName);
@@ -140,6 +145,14 @@ public:
                            QString arguments,
                            int timeoutMs,
                            NvLogLevel logLevel = NvLogLevel::NVLL_VERBOSE);
+
+    QString
+    openPostConnectionToString(QUrl baseUrl,
+                               QString command,
+                               QString arguments,
+                               QByteArray body,
+                               int timeoutMs,
+                               NvLogLevel logLevel = NvLogLevel::NVLL_VERBOSE);
 
     void setServerCert(QSslCertificate serverCert);
 
@@ -170,7 +183,14 @@ public:
              bool localAudio,
              int gamepadMask,
              bool persistGameControllersOnDisconnect,
-             QString& rtspSessionUrl);
+             QString& rtspSessionUrl,
+             bool virtualDisplay = false);
+
+    bool
+    sendClipboard(const QString& text);
+
+    QString
+    getClipboard();
 
     QVector<NvApp>
     getAppList();
@@ -194,6 +214,14 @@ private:
                    QString arguments,
                    int timeoutMs,
                    NvLogLevel logLevel);
+
+    QNetworkReply*
+    openPostConnection(QUrl baseUrl,
+                       QString command,
+                       QString arguments,
+                       QByteArray body,
+                       int timeoutMs,
+                       NvLogLevel logLevel);
 
     NvAddress m_Address;
     QNetworkAccessManager* m_Nam;

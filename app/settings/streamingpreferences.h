@@ -147,6 +147,8 @@ public:
     Q_PROPERTY(bool swapFaceButtons MEMBER swapFaceButtons NOTIFY swapFaceButtonsChanged)
     Q_PROPERTY(bool keepAwake MEMBER keepAwake NOTIFY keepAwakeChanged)
     Q_PROPERTY(CaptureSysKeysMode captureSysKeysMode MEMBER captureSysKeysMode NOTIFY captureSysKeysModeChanged)
+    Q_PROPERTY(bool virtualDisplay MEMBER virtualDisplay NOTIFY virtualDisplayChanged)
+    Q_PROPERTY(bool smartClipboardSync MEMBER smartClipboardSync NOTIFY smartClipboardSyncChanged)
     Q_PROPERTY(Language language MEMBER language NOTIFY languageChanged);
 
     Q_INVOKABLE bool retranslate();
@@ -194,6 +196,8 @@ public:
     UIDisplayMode uiDisplayMode;
     Language language;
     CaptureSysKeysMode captureSysKeysMode;
+    bool virtualDisplay;
+    bool smartClipboardSync;
 
 signals:
     void displayModeChanged();
@@ -232,6 +236,8 @@ signals:
     void swapFaceButtonsChanged();
     void captureSysKeysModeChanged();
     void keepAwakeChanged();
+    void virtualDisplayChanged();
+    void smartClipboardSyncChanged();
     void languageChanged();
 
 private:

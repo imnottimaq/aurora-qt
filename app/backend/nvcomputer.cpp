@@ -63,6 +63,10 @@ NvComputer::NvComputer(QSettings& settings)
     this->isSupportedServerVersion = true;
     this->externalPort = this->remoteAddress.port();
     this->activeHttpsPort = 0;
+    this->virtualDisplayCapable = false;
+    this->virtualDisplayDriverReady = false;
+    this->serverCommands.clear();
+    this->permission = 0xFFFFFFFF;
 }
 
 void NvComputer::setRemoteAddress(QHostAddress address)
@@ -211,6 +215,24 @@ NvComputer::NvComputer(NvHTTP& http, QString serverInfo)
     this->state = NvComputer::CS_ONLINE;
     this->pendingQuit = false;
     this->isSupportedServerVersion = CompatFetcher::isGfeVersionSupported(this->gfeVersion);
+
+    // Apollo protocol extensions
+    QString vdc = NvHTTP::getXmlString(serverInfo, "VirtualDisplayCapable");
+    this->virtualDisplayCapable = (vdc == "true" || vdc == "1");
+
+    QString vddr = NvHTTP::getXmlString(serverInfo, "VirtualDisplayDriverReady");
+    this->virtualDisplayDriverReady = (vddr == "true" || vddr == "1");
+
+    this->serverCommands = NvHTTP::getXmlStringList(serverInfo, "ServerCommand");
+
+    QString permStr = NvHTTP::getXmlString(serverInfo, "Permission");
+    if (!permStr.isEmpty()) {
+        bool ok = false;
+        uint32_t perm = permStr.toUInt(&ok);
+        if (ok) {
+            this->permission = perm;
+        }
+    }
 }
 
 bool NvComputer::wake() const
@@ -571,6 +593,10 @@ bool NvComputer::update(const NvComputer& that)
     ASSIGN_IF_CHANGED(gpuModel);
     ASSIGN_IF_CHANGED_AND_NONNULL(serverCert);
     ASSIGN_IF_CHANGED_AND_NONEMPTY(displayModes);
+    ASSIGN_IF_CHANGED(virtualDisplayCapable);
+    ASSIGN_IF_CHANGED(virtualDisplayDriverReady);
+    ASSIGN_IF_CHANGED(serverCommands);
+    ASSIGN_IF_CHANGED(permission);
 
     if (!that.appList.isEmpty()) {
         // updateAppList() handles merging client-side attributes

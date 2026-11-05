@@ -1683,6 +1683,7 @@ bool Session::startConnectionAsync()
 
     try {
         NvHTTP http(m_Computer);
+        bool useVirtualDisplay = m_Preferences->virtualDisplay && m_Computer->virtualDisplayCapable;
         http.startApp(m_Computer->currentGameId != 0 ? "resume" : "launch",
                       m_Computer->isNvidiaServerSoftware,
                       m_App.id, &m_StreamConfig,
@@ -1690,7 +1691,8 @@ bool Session::startConnectionAsync()
                       m_Preferences->playAudioOnHost,
                       m_InputHandler->getAttachedGamepadMask(),
                       !m_Preferences->multiController,
-                      rtspSessionUrl);
+                      rtspSessionUrl,
+                      useVirtualDisplay);
     } catch (const GfeHttpResponseException& e) {
         emit displayLaunchError(tr("Host returned error: %1").arg(e.toQString()));
         return false;
@@ -2451,3 +2453,128 @@ DispatchDeferredCleanup:
     // reference.
     QThreadPool::globalInstance()->start(new DeferredSessionCleanupTask(this));
 }
+
+bool Session::executeServerCommand(int commandIndex)
+{
+    if (m_Computer == nullptr) {
+        return false;
+    }
+
+    if (commandIndex < 0 || commandIndex >= m_Computer->serverCommands.size()) {
+        QString text = QString("Invalid server command: %1").arg(commandIndex + 1);
+        m_OverlayManager.updateOverlayText(Overlay::OverlayStatusUpdate, text.toUtf8().constData());
+        m_OverlayManager.setOverlayState(Overlay::OverlayStatusUpdate, true);
+        QTimer::singleShot(2000, this, [this]() {
+            if (m_MouseEmulationRefCount == 0) {
+                m_OverlayManager.setOverlayState(Overlay::OverlayStatusUpdate, false);
+            }
+        });
+        return false;
+    }
+
+    QString cmdName = m_Computer->serverCommands.at(commandIndex);
+    qInfo() << "Executing server command:" << cmdName << "index:" << commandIndex;
+
+    int res = LiSendExecServerCmd(static_cast<uint8_t>(commandIndex));
+
+    QString text = QString("Command Executed:\n%1").arg(cmdName);
+    m_OverlayManager.updateOverlayText(Overlay::OverlayStatusUpdate, text.toUtf8().constData());
+    m_OverlayManager.setOverlayState(Overlay::OverlayStatusUpdate, true);
+    QTimer::singleShot(2500, this, [this]() {
+        if (m_MouseEmulationRefCount == 0) {
+            m_OverlayManager.setOverlayState(Overlay::OverlayStatusUpdate, false);
+        }
+    });
+
+    return res == 0 || res == 1;
+}
+
+void Session::showServerCommandsMenu()
+{
+    if (m_Computer == nullptr || m_Computer->serverCommands.isEmpty()) {
+        m_OverlayManager.updateOverlayText(Overlay::OverlayStatusUpdate, "No Apollo server commands available");
+        m_OverlayManager.setOverlayState(Overlay::OverlayStatusUpdate, true);
+        QTimer::singleShot(2500, this, [this]() {
+            if (m_MouseEmulationRefCount == 0) {
+                m_OverlayManager.setOverlayState(Overlay::OverlayStatusUpdate, false);
+            }
+        });
+        return;
+    }
+
+    QString menu = "Apollo Commands (Ctrl+Alt+Shift+1..N):\n";
+    for (int i = 0; i < m_Computer->serverCommands.size() && i < 9; ++i) {
+        menu += QString("%1. %2\n").arg(i + 1).arg(m_Computer->serverCommands.at(i));
+    }
+    if (menu.endsWith('\n')) {
+        menu.chop(1);
+    }
+
+    m_OverlayManager.updateOverlayText(Overlay::OverlayStatusUpdate, menu.toUtf8().constData());
+    m_OverlayManager.setOverlayState(Overlay::OverlayStatusUpdate, true);
+    QTimer::singleShot(4000, this, [this]() {
+        if (m_MouseEmulationRefCount == 0) {
+            m_OverlayManager.setOverlayState(Overlay::OverlayStatusUpdate, false);
+        }
+    });
+}
+
+bool Session::sendClipboard(const QString& text)
+{
+    if (text.isEmpty()) {
+        return false;
+    }
+
+    QByteArray utf8 = text.toUtf8();
+    // 1. Send via ENet encrypted control stream (packet 0x3001)
+    LiSendSetClipboard(utf8.constData(), utf8.size());
+
+    // 2. Also send via HTTP POST to ensure compatibility with host versions
+    if (m_Computer != nullptr) {
+        NvComputer compCopy = *m_Computer;
+        QThread::create([compCopy, text]() mutable {
+            try {
+                NvHTTP http(&compCopy);
+                http.sendClipboard(text);
+            } catch (...) {}
+        })->start();
+    }
+
+    m_OverlayManager.updateOverlayText(Overlay::OverlayStatusUpdate, "Clipboard synced to host");
+    m_OverlayManager.setOverlayState(Overlay::OverlayStatusUpdate, true);
+    QTimer::singleShot(2000, this, [this]() {
+        if (m_MouseEmulationRefCount == 0) {
+            m_OverlayManager.setOverlayState(Overlay::OverlayStatusUpdate, false);
+        }
+    });
+
+    return true;
+}
+
+QString Session::fetchClipboard()
+{
+    if (m_Computer == nullptr) {
+        return QString();
+    }
+
+    QString result;
+    try {
+        NvHTTP http(m_Computer);
+        result = http.getClipboard();
+        if (!result.isEmpty()) {
+            SDL_SetClipboardText(result.toUtf8().constData());
+            m_OverlayManager.updateOverlayText(Overlay::OverlayStatusUpdate, "Clipboard fetched from host");
+            m_OverlayManager.setOverlayState(Overlay::OverlayStatusUpdate, true);
+            QTimer::singleShot(2000, this, [this]() {
+                if (m_MouseEmulationRefCount == 0) {
+                    m_OverlayManager.setOverlayState(Overlay::OverlayStatusUpdate, false);
+                }
+            });
+        }
+    } catch (const std::exception& e) {
+        qWarning() << "Failed to fetch clipboard:" << e.what();
+    }
+
+    return result;
+}
+

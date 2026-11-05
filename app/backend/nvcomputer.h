@@ -101,6 +101,12 @@ public:
     QString gpuModel;
     bool isSupportedServerVersion;
 
+    // Apollo protocol extensions
+    bool virtualDisplayCapable = false;
+    bool virtualDisplayDriverReady = false;
+    QStringList serverCommands;
+    uint32_t permission = 0xFFFFFFFF;
+
     // Persisted traits
     NvAddress localAddress;
     NvAddress remoteAddress;

@@ -113,8 +113,14 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
                 }
             }
 
-            // Send this text to the PC
-            LiSendUtf8TextEvent(text, (unsigned int)strlen(text));
+            if (StreamingPreferences::get()->smartClipboardSync && Session::get() != nullptr) {
+                // Direct clipboard synchronization for Apollo/Sunshine
+                Session::get()->sendClipboard(QString::fromUtf8(text));
+            }
+            else {
+                // Send this text to the PC keystroke by keystroke
+                LiSendUtf8TextEvent(text, (unsigned int)strlen(text));
+            }
 
             // SDL_GetClipboardText() allocates, so we must free
             SDL_free((void*)text);
@@ -122,6 +128,41 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
         else {
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "No text in clipboard to paste!");
+        }
+        break;
+    }
+
+    case KeyComboFetchClipboard:
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "Detected fetch clipboard combo");
+        if (Session::get() != nullptr) {
+            Session::get()->fetchClipboard();
+        }
+        break;
+
+    case KeyComboServerCmdMenu:
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "Detected server commands menu combo");
+        if (Session::get() != nullptr) {
+            Session::get()->showServerCommandsMenu();
+        }
+        break;
+
+    case KeyComboServerCmd1:
+    case KeyComboServerCmd2:
+    case KeyComboServerCmd3:
+    case KeyComboServerCmd4:
+    case KeyComboServerCmd5:
+    case KeyComboServerCmd6:
+    case KeyComboServerCmd7:
+    case KeyComboServerCmd8:
+    case KeyComboServerCmd9:
+    {
+        int cmdIndex = combo - KeyComboServerCmd1;
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                    "Detected server command %d combo", cmdIndex + 1);
+        if (Session::get() != nullptr) {
+            Session::get()->executeServerCommand(cmdIndex);
         }
         break;
     }
