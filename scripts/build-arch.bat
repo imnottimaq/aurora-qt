@@ -167,6 +167,7 @@ popd
 
 echo Compiling Aurora in %BUILD_CONFIG% configuration
 pushd %BUILD_FOLDER%
+%SOURCE_ROOT%\scripts\jom.exe -C app -f Makefile.Release compiler_moc_source_make_all 2>nul
 %SOURCE_ROOT%\scripts\jom.exe %BUILD_CONFIG%
 if !ERRORLEVEL! NEQ 0 goto Error
 popd

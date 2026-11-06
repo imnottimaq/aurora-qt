@@ -51,6 +51,7 @@ popd
 
 echo Compiling Moonlight in $BUILD_CONFIG configuration
 pushd $BUILD_FOLDER
+make -C app -f Makefile.Release compiler_moc_source_make_all 2>/dev/null || true
 make -j$(nproc) $(echo "$BUILD_CONFIG" | tr '[:upper:]' '[:lower:]') || fail "Make failed!"
 popd
 
@@ -64,8 +65,18 @@ export QMAKE=qmake6
 
 echo Creating AppImage
 pushd $INSTALLER_FOLDER
+SDL3_LIB=/usr/local/lib/libSDL3.so.0
+if [ ! -f "$SDL3_LIB" ]; then
+  SDL3_LIB=/usr/lib/libSDL3.so.0
+fi
+
+EXTRA_LIB_ARGS=""
+if [ -f "/home/int/.local/lib/libSDL2_ttf-2.0.so.0" ]; then
+  EXTRA_LIB_ARGS="--library=/home/int/.local/lib/libSDL2_ttf-2.0.so.0"
+fi
+
 VERSION=$VERSION $LINUXDEPLOY --appdir $DEPLOY_FOLDER \
-  --library=/usr/local/lib/libSDL3.so.0 \
+  --library=$SDL3_LIB $EXTRA_LIB_ARGS \
   --plugin qt --output appimage || fail "linuxdeploy failed!"
 popd
 

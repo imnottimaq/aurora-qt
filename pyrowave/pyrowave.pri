@@ -80,7 +80,10 @@ SOURCES += \
 PYROWAVE_GEN_DIR = $$OUT_PWD/pyrowave_generated
 INCLUDEPATH += $$PYROWAVE_GEN_DIR
 
-isEmpty(PYTHON): PYTHON = python3
+isEmpty(PYTHON) {
+    win32: PYTHON = python
+    else:  PYTHON = python3
+}
 isEmpty(PYROWAVE_GLSLANG): PYROWAVE_GLSLANG = glslangValidator
 
 PYROWAVE_GEN_CMD = $$PYTHON $$PYROWAVE_ROOT/tools/generate_shaders.py \
