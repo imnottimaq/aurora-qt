@@ -23,6 +23,7 @@
 
 import argparse
 import os
+import shutil
 import struct
 import subprocess
 import sys
@@ -116,6 +117,34 @@ def main():
     ap.add_argument("--namespace", default="pyrowave")
     args = ap.parse_args()
 
+    glslang = args.glslang
+    if not shutil.which(glslang):
+        vulkan_sdk = os.environ.get("VULKAN_SDK")
+        if vulkan_sdk:
+            for cand in [
+                os.path.join(vulkan_sdk, "Bin", "glslangValidator.exe"),
+                os.path.join(vulkan_sdk, "bin", "glslangValidator.exe"),
+                os.path.join(vulkan_sdk, "bin", "glslangValidator"),
+            ]:
+                if os.path.isfile(cand):
+                    glslang = cand
+                    break
+
+    spirv_opt = args.spirv_opt
+    if spirv_opt and not shutil.which(spirv_opt):
+        vulkan_sdk = os.environ.get("VULKAN_SDK")
+        if vulkan_sdk:
+            for cand in [
+                os.path.join(vulkan_sdk, "Bin", "spirv-opt.exe"),
+                os.path.join(vulkan_sdk, "bin", "spirv-opt.exe"),
+                os.path.join(vulkan_sdk, "bin", "spirv-opt"),
+            ]:
+                if os.path.isfile(cand):
+                    spirv_opt = cand
+                    break
+        else:
+            spirv_opt = None
+
     shader_dir = os.path.abspath(args.shader_dir)
     out_dir = os.path.abspath(args.output_dir)
     os.makedirs(out_dir, exist_ok=True)
@@ -132,7 +161,7 @@ def main():
         stage, shader_name = det
         src = os.path.join(shader_dir, name)
         spv = os.path.join(spv_dir, shader_name + ".spv")
-        compile_one(args.glslang, args.spirv_opt, args.target_env, shader_dir, src, stage, spv)
+        compile_one(glslang, spirv_opt, args.target_env, shader_dir, src, stage, spv)
         shaders.append((shader_name, read_spirv_words(spv)))
 
     if not shaders:

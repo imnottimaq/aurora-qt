@@ -84,6 +84,14 @@ isEmpty(PYTHON) {
     win32: PYTHON = python
     else:  PYTHON = python3
 }
+isEmpty(PYROWAVE_GLSLANG) {
+    VULKAN_SDK_ENV = $$(VULKAN_SDK)
+    !isEmpty(VULKAN_SDK_ENV) {
+        win32: exists($$VULKAN_SDK_ENV/Bin/glslangValidator.exe): PYROWAVE_GLSLANG = $$VULKAN_SDK_ENV/Bin/glslangValidator.exe
+        win32: exists($$VULKAN_SDK_ENV/bin/glslangValidator.exe): PYROWAVE_GLSLANG = $$VULKAN_SDK_ENV/bin/glslangValidator.exe
+        unix: exists($$VULKAN_SDK_ENV/bin/glslangValidator): PYROWAVE_GLSLANG = $$VULKAN_SDK_ENV/bin/glslangValidator
+    }
+}
 isEmpty(PYROWAVE_GLSLANG): PYROWAVE_GLSLANG = glslangValidator
 
 PYROWAVE_GEN_CMD = $$PYTHON $$PYROWAVE_ROOT/tools/generate_shaders.py \
