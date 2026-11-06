@@ -69,7 +69,11 @@ def compile_one(glslang, spirv_opt, target_env, shader_dir, path, stage, out_spv
         path,
         "-o", out_spv,
     ]
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+    except FileNotFoundError as e:
+        sys.stderr.write("pyrowave: failed to execute glslang '%s': %s\n" % (glslang, e))
+        raise SystemExit(1)
     if proc.returncode != 0:
         sys.stderr.write("pyrowave: failed to compile %s\n%s\n%s\n" %
                          (path, proc.stdout, proc.stderr))
@@ -117,32 +121,73 @@ def main():
     ap.add_argument("--namespace", default="pyrowave")
     args = ap.parse_args()
 
-    glslang = args.glslang
-    if not shutil.which(glslang):
-        vulkan_sdk = os.environ.get("VULKAN_SDK")
+    def normalize_win_path(p):
+        if not p:
+            return p
+        if sys.platform == "win32" and p.startswith("/") and len(p) > 2 and p[2] == "/":
+            return p[1].upper() + ":" + p[2:].replace("/", "\\")
+        return p
+
+    glslang = normalize_win_path(args.glslang)
+    if not shutil.which(glslang) and not os.path.isfile(glslang):
+        candidates = []
+        vulkan_sdk = normalize_win_path(os.environ.get("VULKAN_SDK"))
         if vulkan_sdk:
-            for cand in [
+            candidates.extend([
                 os.path.join(vulkan_sdk, "Bin", "glslangValidator.exe"),
                 os.path.join(vulkan_sdk, "bin", "glslangValidator.exe"),
                 os.path.join(vulkan_sdk, "bin", "glslangValidator"),
-            ]:
-                if os.path.isfile(cand):
-                    glslang = cand
-                    break
+            ])
+        workspace = normalize_win_path(os.environ.get("GITHUB_WORKSPACE"))
+        if workspace:
+            candidates.extend([
+                os.path.join(workspace, "vulkan_sdk", "Bin", "glslangValidator.exe"),
+                os.path.join(workspace, "vulkan_sdk", "bin", "glslangValidator.exe"),
+            ])
+        for cand in candidates:
+            if os.path.isfile(cand):
+                glslang = cand
+                break
 
-    spirv_opt = args.spirv_opt
-    if spirv_opt and not shutil.which(spirv_opt):
-        vulkan_sdk = os.environ.get("VULKAN_SDK")
+    if not shutil.which(glslang) and not os.path.isfile(glslang):
+        search_dirs = [os.getcwd()]
+        ws = normalize_win_path(os.environ.get("GITHUB_WORKSPACE"))
+        if ws and os.path.isdir(ws):
+            search_dirs.append(ws)
+        for sdir in search_dirs:
+            for root, dirs, files in os.walk(sdir):
+                for f in files:
+                    if f.lower() in ("glslangvalidator.exe", "glslangvalidator"):
+                        cand = os.path.join(root, f)
+                        if os.path.isfile(cand):
+                            glslang = cand
+                            break
+                if os.path.isfile(glslang):
+                    break
+            if os.path.isfile(glslang):
+                break
+
+    spirv_opt = normalize_win_path(args.spirv_opt)
+    if spirv_opt and not shutil.which(spirv_opt) and not os.path.isfile(spirv_opt):
+        candidates = []
+        vulkan_sdk = normalize_win_path(os.environ.get("VULKAN_SDK"))
         if vulkan_sdk:
-            for cand in [
+            candidates.extend([
                 os.path.join(vulkan_sdk, "Bin", "spirv-opt.exe"),
                 os.path.join(vulkan_sdk, "bin", "spirv-opt.exe"),
                 os.path.join(vulkan_sdk, "bin", "spirv-opt"),
-            ]:
-                if os.path.isfile(cand):
-                    spirv_opt = cand
-                    break
-        else:
+            ])
+        workspace = normalize_win_path(os.environ.get("GITHUB_WORKSPACE"))
+        if workspace:
+            candidates.extend([
+                os.path.join(workspace, "vulkan_sdk", "Bin", "spirv-opt.exe"),
+                os.path.join(workspace, "vulkan_sdk", "bin", "spirv-opt.exe"),
+            ])
+        for cand in candidates:
+            if os.path.isfile(cand):
+                spirv_opt = cand
+                break
+        if not shutil.which(spirv_opt) and not os.path.isfile(spirv_opt):
             spirv_opt = None
 
     shader_dir = os.path.abspath(args.shader_dir)

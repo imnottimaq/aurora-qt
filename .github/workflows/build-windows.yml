@@ -39,12 +39,31 @@ jobs:
       - name: Add Vulkan to PATH
         shell: pwsh
         run: |
-          Write-Host "VULKAN_SDK is $env:VULKAN_SDK"
-          if (Test-Path "$env:VULKAN_SDK\Bin") {
-            echo "$env:VULKAN_SDK\Bin" >> $env:GITHUB_PATH
+          Write-Host "Raw VULKAN_SDK: $env:VULKAN_SDK"
+          $vpath = $env:VULKAN_SDK
+          if ($vpath -match '^/([a-zA-Z])/(.*)') {
+            $drive = $Matches[1].ToUpper()
+            $rest = $Matches[2].Replace('/', '\')
+            $vpath = "$drive`:\$rest"
           }
-          if (Test-Path "$env:VULKAN_SDK\bin") {
-            echo "$env:VULKAN_SDK\bin" >> $env:GITHUB_PATH
+          if (-not (Test-Path $vpath)) {
+            $vpath = "$env:GITHUB_WORKSPACE\vulkan_sdk"
+          }
+          Write-Host "Resolved VULKAN_SDK: $vpath"
+          "VULKAN_SDK=$vpath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          foreach ($cand in @("$vpath\Bin", "$vpath\bin")) {
+            if (Test-Path $cand) {
+              Write-Host "Adding to GITHUB_PATH: $cand"
+              $cand | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+            }
+          }
+          $glslang = Get-ChildItem -Path $env:GITHUB_WORKSPACE -Filter "glslangValidator.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($glslang) {
+            Write-Host "Found glslangValidator.exe at $($glslang.FullName)"
+            $glslangDir = $glslang.DirectoryName
+            $glslangDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+            $glslangParent = Split-Path $glslangDir -Parent
+            "VULKAN_SDK=$glslangParent" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           }
 
       - name: Install Qt
@@ -59,7 +78,8 @@ jobs:
       - name: Build x64 binaries (Windows)
         shell: cmd
         run: |
-          set "PATH=%QT_PATH%;%VULKAN_SDK%\bin;%PATH%"
+          where glslangValidator.exe || echo glslangValidator.exe not in PATH
+          set "PATH=%QT_PATH%;%VULKAN_SDK%\bin;%VULKAN_SDK%\Bin;%PATH%"
           scripts\build-arch.bat Release x64
         env:
           QT_PATH: ${{ runner.workspace }}\Qt\6.11.1\msvc2022_64\bin
