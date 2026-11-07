@@ -537,10 +537,9 @@ pyrowave {
     else:win32:CONFIG(debug, debug|release): LIBS += -L$$OUT_PWD/../pyrowave/debug/ -lpyrowave
     else: LIBS += -L$$OUT_PWD/../pyrowave/ -lpyrowave
 
-    # VMA inside libpyrowave references Vulkan entry points directly, so the
-    # final link must pull in the Vulkan loader.
-    win32: LIBS += -lvulkan-1
-    else:  LIBS += -lvulkan
+    # On Linux the Vulkan loader is linked directly; on Windows, VMA and vk::raii
+    # load entry points dynamically (VMA_DYNAMIC_VULKAN_FUNCTIONS=1 / LoadLibrary).
+    !win32: LIBS += -lvulkan
 
     INCLUDEPATH += \
         $$PWD/../pyrowave/src \
