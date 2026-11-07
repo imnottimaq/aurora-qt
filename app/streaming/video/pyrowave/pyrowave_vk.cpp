@@ -181,13 +181,26 @@ namespace pyrowave_vk {
       vk::DeviceQueueCreateInfo queue_info {
         .queueFamilyIndex = cqf, .queueCount = 1, .pQueuePriorities = &prio};
 
+      auto supported_base = supported.get<vk::PhysicalDeviceFeatures2>().features;
+      uint32_t dev_api = self->phys_dev.getProperties().apiVersion;
+      SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                  "pyrowave: Vulkan device apiVersion=%u.%u.%u, writeWithoutFormat=%d, readWithoutFormat=%d, int16=%d, fp16=%d, present_wait=%d",
+                  VK_VERSION_MAJOR(dev_api), VK_VERSION_MINOR(dev_api), VK_VERSION_PATCH(dev_api),
+                  (int) supported_base.shaderStorageImageWriteWithoutFormat,
+                  (int) supported_base.shaderStorageImageReadWithoutFormat,
+                  (int) supported_base.shaderInt16,
+                  (int) self->caps_.shader_float16,
+                  (int) self->caps_.present_wait);
+
+      if (!supported_base.shaderStorageImageWriteWithoutFormat) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "pyrowave: device lacks shaderStorageImageWriteWithoutFormat");
+        return nullptr;
+      }
+
       vk::PhysicalDeviceFeatures base_features {};
       base_features.shaderStorageImageWriteWithoutFormat = true;
-      // Format-less READS too: the overlay blend reads the output image, which
-      // is RGBA8 for SDR and RGBA16F for HDR. Universally supported on the
-      // desktop GPUs this decoder targets.
-      base_features.shaderStorageImageReadWithoutFormat = true;
-      base_features.shaderInt16 = supported.get<vk::PhysicalDeviceFeatures2>().features.shaderInt16;
+      base_features.shaderStorageImageReadWithoutFormat = supported_base.shaderStorageImageReadWithoutFormat;
+      base_features.shaderInt16 = supported_base.shaderInt16;
 
       vk::StructureChain<
         vk::DeviceCreateInfo,
@@ -209,8 +222,15 @@ namespace pyrowave_vk {
       dci.pEnabledFeatures = &base_features;
 
       auto &e11 = dev_chain.get<vk::PhysicalDeviceVulkan11Features>();
-      e11.samplerYcbcrConversion = q11.samplerYcbcrConversion;
-      e11.storageBuffer16BitAccess = q11.storageBuffer16BitAccess;
+      if (dev_api >= VK_API_VERSION_1_2) {
+        e11.samplerYcbcrConversion = q11.samplerYcbcrConversion;
+        e11.storageBuffer16BitAccess = q11.storageBuffer16BitAccess;
+        if (!e11.samplerYcbcrConversion && !e11.storageBuffer16BitAccess) {
+          dev_chain.unlink<vk::PhysicalDeviceVulkan11Features>();
+        }
+      } else {
+        dev_chain.unlink<vk::PhysicalDeviceVulkan11Features>();
+      }
 
       dev_chain.get<vk::PhysicalDevice8BitStorageFeatures>().storageBuffer8BitAccess = q8.storageBuffer8BitAccess;
       auto &esg = dev_chain.get<vk::PhysicalDeviceSubgroupSizeControlFeatures>();
@@ -222,22 +242,27 @@ namespace pyrowave_vk {
       dev_chain.get<vk::PhysicalDevicePresentIdFeaturesKHR>().presentId = qpid.presentId;
       dev_chain.get<vk::PhysicalDevicePresentWaitFeaturesKHR>().presentWait = qpw.presentWait;
 
-      // Link each feature struct based on whether the FEATURE is supported (on
-      // 1.2/1.3 devices these are core and not enumerable as extensions, but the
-      // structs/queries stay valid). Extension NAMES were only enabled if enumerable.
-      if (!q8.storageBuffer8BitAccess)
+      auto has_ext = [&](const char *name) {
+        for (auto *e : enabled_exts) {
+          if (std::strcmp(e, name) == 0) return true;
+        }
+        return false;
+      };
+
+      if (!q8.storageBuffer8BitAccess || (dev_api < VK_API_VERSION_1_2 && !has_ext(VK_KHR_8BIT_STORAGE_EXTENSION_NAME)))
         dev_chain.unlink<vk::PhysicalDevice8BitStorageFeatures>();
-      if (!(qsg.subgroupSizeControl && qsg.computeFullSubgroups))
+      if (!(qsg.subgroupSizeControl && qsg.computeFullSubgroups) || (dev_api < VK_API_VERSION_1_3 && !has_ext(VK_EXT_SUBGROUP_SIZE_CONTROL_EXTENSION_NAME)))
         dev_chain.unlink<vk::PhysicalDeviceSubgroupSizeControlFeatures>();
-      if (!qf16.shaderFloat16)
+      if (!qf16.shaderFloat16 || (dev_api < VK_API_VERSION_1_2 && !has_ext(VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME)))
         dev_chain.unlink<vk::PhysicalDeviceShaderFloat16Int8Features>();
-      if (!qts.timelineSemaphore)
+      if (!qts.timelineSemaphore || (dev_api < VK_API_VERSION_1_2 && !has_ext(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME)))
         dev_chain.unlink<vk::PhysicalDeviceTimelineSemaphoreFeatures>();
-      if (!qsync.synchronization2)
+      if (!qsync.synchronization2 || (dev_api < VK_API_VERSION_1_3 && !has_ext(VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME)))
         dev_chain.unlink<vk::PhysicalDeviceSynchronization2Features>();
-      if (!self->caps_.present_wait) {
+      if (!self->caps_.present_wait || !has_ext(VK_KHR_PRESENT_ID_EXTENSION_NAME) || !has_ext(VK_KHR_PRESENT_WAIT_EXTENSION_NAME)) {
         dev_chain.unlink<vk::PhysicalDevicePresentIdFeaturesKHR>();
         dev_chain.unlink<vk::PhysicalDevicePresentWaitFeaturesKHR>();
+        self->caps_.present_wait = false;
       }
 
       self->dev = vk::raii::Device(self->phys_dev, dev_chain.get<vk::DeviceCreateInfo>());

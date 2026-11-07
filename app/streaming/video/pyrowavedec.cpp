@@ -63,7 +63,7 @@ PyroWaveVideoDecoder::PyroWaveVideoDecoder(bool testOnly):
 
 PyroWaveVideoDecoder::~PyroWaveVideoDecoder() {
     // Stop the overlay manager from calling back into us as we tear down.
-    if (!m_TestOnly) {
+    if (!m_TestOnly && Session::get() != nullptr) {
         Session::get()->getOverlayManager().setOverlayRenderer(nullptr);
     }
     stopPresentWaitThread();
@@ -463,7 +463,7 @@ bool PyroWaveVideoDecoder::initOverlayPipeline() {
 // Poll OverlayManager for a fresh overlay surface and upload it to the GPU
 // texture (only when it actually changed, ~1/sec). Runs on the decoder thread.
 void PyroWaveVideoDecoder::maybeUploadOverlayTexture() {
-    if (!*m_OverlayPipe) {
+    if (!*m_OverlayPipe || !Session::get()) {
         return;
     }
     SDL_Surface *surface = Session::get()->getOverlayManager().getUpdatedOverlaySurface(Overlay::OverlayDebug);

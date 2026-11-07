@@ -168,7 +168,9 @@ public:
 
 	~basic_allocation()
 	{
-		traits::destroy(resource, allocation, mapped);
+		if (allocation != nullptr || mapped != nullptr || *resource) {
+			traits::destroy(resource, allocation, mapped);
+		}
 	}
 
 	void * map()

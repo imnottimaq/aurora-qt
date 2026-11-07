@@ -45,6 +45,12 @@ void basic_allocation_traits<vk::Buffer>::destroy(
         VmaAllocation allocation,
         void * mapped)
 {
+	if (!allocation && !mapped && !*buffer)
+		return;
+
+	if (!vk_allocator::get())
+		return;
+
 	VmaAllocator allocator = vk_allocator::instance();
 
 	if (mapped)
@@ -64,6 +70,9 @@ void * basic_allocation_traits_base::map(VmaAllocation allocation)
 
 void basic_allocation_traits_base::unmap(VmaAllocation allocation)
 {
+	if (!allocation || !vk_allocator::get())
+		return;
+
 	VmaAllocator allocator = vk_allocator::instance();
 
 	vmaUnmapMemory(allocator, allocation);
@@ -89,6 +98,12 @@ void basic_allocation_traits<vk::Image>::destroy(
         VmaAllocation allocation,
         void * mapped)
 {
+	if (!allocation && !mapped && !*image)
+		return;
+
+	if (!vk_allocator::get())
+		return;
+
 	VmaAllocator allocator = vk_allocator::instance();
 
 	if (mapped)

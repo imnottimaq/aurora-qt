@@ -45,6 +45,11 @@ protected:
 	singleton & operator=(const singleton &) = delete;
 
 public:
+	static T * get()
+	{
+		return instance_;
+	}
+
 	static T & instance()
 	{
 		assert(instance_ != nullptr);
