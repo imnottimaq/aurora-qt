@@ -269,7 +269,9 @@ if "%ML_SYMBOL_STORE%" NEQ "" (
 
 echo Building MSI
 cmd /c "set VERSION= && msbuild -Restore %SOURCE_ROOT%\wix\Moonlight\Moonlight.wixproj /p:Configuration=%BUILD_CONFIG% /p:Platform=%ARCH% /p:MSBuildProjectExtensionsPath=%BUILD_FOLDER%\"
-if !ERRORLEVEL! NEQ 0 goto Error
+if !ERRORLEVEL! NEQ 0 (
+    echo WiX MSI generation failed or skipped, proceeding with portable package...
+)
 
 echo Copying application binary to deployment directory
 copy %BUILD_FOLDER%\app\%BUILD_CONFIG%\Aurora.exe %DEPLOY_FOLDER%

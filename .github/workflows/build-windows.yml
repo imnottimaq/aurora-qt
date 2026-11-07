@@ -50,7 +50,8 @@ jobs:
             $vpath = "$env:GITHUB_WORKSPACE\vulkan_sdk"
           }
           Write-Host "Resolved VULKAN_SDK: $vpath"
-          "VULKAN_SDK=$vpath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $vpathForward = $vpath.Replace('\', '/')
+          "VULKAN_SDK=$vpathForward" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           foreach ($cand in @("$vpath\Bin", "$vpath\bin")) {
             if (Test-Path $cand) {
               Write-Host "Adding to GITHUB_PATH: $cand"
@@ -62,8 +63,20 @@ jobs:
             Write-Host "Found glslangValidator.exe at $($glslang.FullName)"
             $glslangDir = $glslang.DirectoryName
             $glslangDir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-            $glslangParent = Split-Path $glslangDir -Parent
+            $glslangParent = (Split-Path $glslangDir -Parent).Replace('\', '/')
             "VULKAN_SDK=$glslangParent" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          }
+          $vulkanLib = Get-ChildItem -Path $env:GITHUB_WORKSPACE -Filter "vulkan-1.lib" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($vulkanLib) {
+            Write-Host "Found vulkan-1.lib at $($vulkanLib.FullName)"
+            $targetDir = "$env:GITHUB_WORKSPACE\libs\windows\lib\x64"
+            if (-not (Test-Path $targetDir)) {
+              New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+            }
+            Copy-Item -Path $vulkanLib.FullName -Destination $targetDir -Force
+            Write-Host "Copied vulkan-1.lib to $targetDir"
+          } else {
+            Write-Warning "vulkan-1.lib not found in workspace search!"
           }
 
       - name: Install Qt
@@ -80,6 +93,7 @@ jobs:
         run: |
           where glslangValidator.exe || echo glslangValidator.exe not in PATH
           set "PATH=%QT_PATH%;%VULKAN_SDK%\bin;%VULKAN_SDK%\Bin;%PATH%"
+          set "LIB=%VULKAN_SDK%\Lib;%VULKAN_SDK%\lib;%GITHUB_WORKSPACE%\libs\windows\lib\x64;%LIB%"
           scripts\build-arch.bat Release x64
         env:
           QT_PATH: ${{ runner.workspace }}\Qt\6.11.1\msvc2022_64\bin

@@ -563,10 +563,15 @@ pyrowave {
         # already wins the search). The Vulkan SDK is APPENDED only as a fallback for
         # anything the bundled set lacks. pyrowave.pro uses the identical
         # bundled-first / SDK-fallback order, keeping the dispatcher layout consistent.
-        win32: INCLUDEPATH += $$VULKAN_SDK_ENV/Include
-        else:  INCLUDEPATH += $$VULKAN_SDK_ENV/include
-        # vulkan-1.lib (the Vulkan loader import library) lives in the SDK's Lib dir.
-        win32: LIBS += -L$$VULKAN_SDK_ENV/Lib
+        VULKAN_SDK_PATH = $$replace(VULKAN_SDK_ENV, \\\\, /)
+        win32 {
+            INCLUDEPATH += $$VULKAN_SDK_PATH/Include $$VULKAN_SDK_PATH/include
+            # vulkan-1.lib (the Vulkan loader import library) lives in the SDK's Lib dir.
+            LIBS += -L$$VULKAN_SDK_PATH/Lib -L$$VULKAN_SDK_PATH/lib
+        } else {
+            INCLUDEPATH += $$VULKAN_SDK_PATH/include
+            LIBS += -L$$VULKAN_SDK_PATH/lib
+        }
     }
 
     # PyroWave decoder integration sources (Vulkan context + IVideoDecoder).
